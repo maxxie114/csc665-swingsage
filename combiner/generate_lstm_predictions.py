@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime, timedelta
 
 
-def load_lstm_model_and_scaler(model_path='lstm_model.keras', scaler_path='scaler.json'):
+def load_lstm_model_and_scaler(model_path='../models/lstm_model.keras', scaler_path='../models/scaler.json'):
     """Load the trained LSTM model and reconstruct the scaler."""
     model = load_model(model_path)
     
@@ -127,9 +127,9 @@ def generate_signal_soft(pct_change, threshold=0.005, temperature=0.01):
     return signal, probs.tolist()
 
 
-def generate_lstm_predictions(llm_data_path='llm_training_data_aapl.csv', 
+def generate_lstm_predictions(llm_data_path='../datasets/llm_predictions_aapl.csv', 
                                ticker='AAPL',
-                               output_path='combined_training_data.csv'):
+                               output_path='../datasets/combined_llm_lstm_aapl_90day.csv'):
     """
     Generate LSTM predictions for all dates in the LLM training data.
     
