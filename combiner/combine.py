@@ -74,7 +74,7 @@ def ground_truth_to_onehot(gt_labels):
     return torch.tensor([label_map[label] for label in gt_labels], dtype=torch.float32)
 
 
-def load_combined_dataset(csv_path='combined_training_data.csv', use_soft_lstm=True):
+def load_combined_dataset(csv_path='../datasets/combined_llm_lstm_aapl_90day.csv', use_soft_lstm=True):
     """
     Load the combined training dataset.
     
@@ -329,7 +329,7 @@ def main():
         'beta': best_model.beta.item(),
         'lstm_type': best_type,
         'accuracy': max(acc_soft, acc_hard)
-    }, 'combiner_weights.pt')
+    }, '../models/combiner_weights_90day.pt')
     print("\nSaved best model weights to combiner_weights.pt")
     
     return best_model, history_soft, history_hard
