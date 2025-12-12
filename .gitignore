@@ -1,0 +1,19 @@
+.env
+.env.*
+*.env
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Jupyter artifacts
+.ipynb_checkpoints/
+
+# OS junk
+.DS_Store
+
+# log file
+*.log
+*.txt
