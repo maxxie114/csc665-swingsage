@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
 
@@ -129,22 +130,28 @@ def train_combiner(model, llm_vectors, lstm_vectors, gt_vectors,
         Training history dict
     """
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
+    # Use NLLLoss since we're working with probability distributions
+    # We'll apply log_softmax to the combined output before computing loss
+    criterion = nn.NLLLoss()
     
     history = {'loss': [], 'accuracy': [], 'alpha': [], 'beta': []}
     
-    # Convert ground truth to class indices for CrossEntropyLoss
+    # Convert ground truth to class indices
     gt_indices = torch.argmax(gt_vectors, dim=1)
     
     for epoch in range(epochs):
         model.train()
         optimizer.zero_grad()
         
-        # Forward pass
+        # Forward pass - get weighted combination of probability vectors
         combined = model(llm_vectors, lstm_vectors)
         
+        # Apply log_softmax to convert combined probabilities to log-probabilities
+        # This is mathematically correct for NLLLoss which expects log-probabilities
+        log_probs = F.log_softmax(combined, dim=1)
+        
         # Compute loss
-        loss = criterion(combined, gt_indices)
+        loss = criterion(log_probs, gt_indices)
         
         # Backward pass
         loss.backward()
