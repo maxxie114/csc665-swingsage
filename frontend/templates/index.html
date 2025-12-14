@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwingSage | AI Trading Dashboard</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-wrapper">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="SwingSage Logo" class="logo-full">
+                </div>
+            </div>
+            
+            <nav class="nav">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="9"/>
+                        <rect x="14" y="3" width="7" height="5"/>
+                        <rect x="14" y="12" width="7" height="9"/>
+                        <rect x="3" y="16" width="7" height="5"/>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="#" class="nav-item" data-view="portfolio">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    Portfolio
+                </a>
+                <a href="#" class="nav-item" data-view="predictions">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    Predictions
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="model-status">
+                    <div class="status-dot"></div>
+                    <span>Model Active</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Floating Chat Button -->
+        <button class="chat-float-button" id="chatFloatButton">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+        </button>
+        
+        <!-- Floating Chat Window -->
+        <div class="chat-window" id="chatWindow" style="display: none;">
+            <div class="chat-window-header">
+                <h3>AI Trading Assistant</h3>
+                <div class="chat-window-controls">
+                    <button class="chat-minimize" id="chatMinimize" title="Minimize">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </button>
+                    <button class="chat-close" id="chatClose" title="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chat-window-content">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message ai">
+                        <div class="message-content">
+                            <p>Hi! I'm your AI trading assistant. I can help you with:</p>
+                            <p>• Stock information: "What's the current price of AAPL?", "What was yesterday's close for Tesla?", "52-week high for NVDA"</p>
+                            <p>• Trading: "I want to buy Apple stock" or "Sell 5 shares of TSLA"</p>
+                            <p>• Predictions: "What do you think about MSFT?"</p>
+                        </div>
+                        <div class="message-time">Just now</div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Type your message..." autocomplete="off">
+                    <button class="chat-send" id="chatSend">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Resize Handle -->
+            <div class="chat-resize-handle" id="chatResizeHandle"></div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="pageTitle">Dashboard</h1>
+                    <p class="subtitle" id="pageSubtitle">Account Overview</p>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                        <input type="text" id="symbolSearch" placeholder="Search symbol..." value="AAPL">
+                    </div>
+                    <button class="btn btn-primary" onclick="refreshData()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6"/>
+                            <path d="M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div class="view-content" id="dashboardView">
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Portfolio Value</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="portfolioValue">$0.00</div>
+                    <div class="stat-change positive" id="portfolioChange">+0.00%</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Today's P&L</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3v18h18"/>
+                            <path d="M7 16l4-4 4 4 5-6"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="todayPL">$0.00</div>
+                    <div class="stat-change" id="todayPLPercent">+0.00%</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Buying Power</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                            <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="buyingPower">$0.00</div>
+                    <div class="stat-change neutral">Available</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">Open Positions</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="positionCount">0</div>
+                    <div class="stat-change neutral">Active</div>
+                </div>
+            </div>
+            </div>
+
+            <!-- Portfolio View -->
+            <div class="view-content" id="portfolioView" style="display: none;">
+                <div class="content-grid">
+                    <!-- Positions -->
+                    <div class="card positions-card">
+                        <div class="card-header">
+                            <h2>Open Positions</h2>
+                            <span class="position-count" id="positionsCount">0</span>
+                        </div>
+                        <div class="positions-list" id="positionsList">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                                </svg>
+                                <p>No open positions</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Orders -->
+                    <div class="card orders-card">
+                        <div class="card-header">
+                            <h2>Recent Orders</h2>
+                        </div>
+                        <div class="orders-list" id="ordersList">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                    <path d="M14 2v6h6"/>
+                                    <path d="M16 13H8"/>
+                                    <path d="M16 17H8"/>
+                                    <path d="M10 9H8"/>
+                                </svg>
+                                <p>No recent orders</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Trade -->
+                    <div class="card trade-card">
+                        <div class="card-header">
+                            <h2>Quick Trade</h2>
+                        </div>
+                        <div class="trade-content">
+                            <div class="trade-tabs">
+                                <button class="trade-tab active" data-side="buy">Buy</button>
+                                <button class="trade-tab" data-side="sell">Sell</button>
+                            </div>
+                            
+                            <div class="trade-form">
+                                <div class="form-group">
+                                    <label>Symbol</label>
+                                    <input type="text" id="tradeSymbol" value="AAPL" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Quantity</label>
+                                    <input type="number" id="tradeQty" value="1" min="1" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Estimated Cost</label>
+                                    <div class="estimated-cost" id="estimatedCost">$0.00</div>
+                                </div>
+                                <button class="btn btn-trade buy" id="tradeBtn" onclick="executeTrade()">
+                                    Buy AAPL
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Predictions View -->
+            <div class="view-content" id="predictionsView" style="display: none;">
+                <!-- Prediction Panel -->
+                <div class="card prediction-card">
+                    <div class="card-header">
+                        <h2>AI Prediction</h2>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="symbol-badge" id="predictionSymbol">AAPL</span>
+                            <span id="currentPrice" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-secondary);">$0.00</span>
+                        </div>
+                    </div>
+                    <div class="prediction-content">
+                        <div class="live-price">
+                            <div class="price-value" id="livePrice">$0.00</div>
+                            <div class="price-meta">
+                                <span class="price-change" id="livePriceChange">0.00%</span>
+                                <span class="price-time" id="livePriceTime">--</span>
+                            </div>
+                        </div>
+
+                        <div class="signal-display" id="signalDisplay">
+                            <div class="signal-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 19V5M5 12l7-7 7 7"/>
+                                </svg>
+                            </div>
+                            <span class="signal-text">HOLD</span>
+                        </div>
+                        
+                        <div class="confidence-meter">
+                            <div class="confidence-label">
+                                <span>Confidence</span>
+                                <span id="confidenceValue">0%</span>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" id="confidenceFill"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="model-breakdown">
+                            <h3>Model Breakdown</h3>
+                            <div class="model-row">
+                                <div class="model-info">
+                                    <span class="model-name">LLM</span>
+                                    <span class="model-weight" id="llmWeight">14%</span>
+                                </div>
+                                <div class="model-signal" id="llmSignal">BUY</div>
+                            </div>
+                            <div class="model-row">
+                                <div class="model-info">
+                                    <span class="model-name">LSTM</span>
+                                    <span class="model-weight" id="lstmWeight">86%</span>
+                                </div>
+                                <div class="model-signal" id="lstmSignal">SELL</div>
+                            </div>
+                        </div>
+                        
+                        <div class="probability-bars">
+                            <div class="prob-item">
+                                <span class="prob-label">Buy</span>
+                                <div class="prob-bar">
+                                    <div class="prob-fill buy" id="buyProb"></div>
+                                </div>
+                                <span class="prob-value" id="buyProbValue">0%</span>
+                            </div>
+                            <div class="prob-item">
+                                <span class="prob-label">Sell</span>
+                                <div class="prob-bar">
+                                    <div class="prob-fill sell" id="sellProb"></div>
+                                </div>
+                                <span class="prob-value" id="sellProbValue">0%</span>
+                            </div>
+                            <div class="prob-item">
+                                <span class="prob-label">Hold</span>
+                                <div class="prob-bar">
+                                    <div class="prob-fill hold" id="holdProb"></div>
+                                </div>
+                                <span class="prob-value" id="holdProbValue">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
