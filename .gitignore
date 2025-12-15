@@ -1,3 +1,4 @@
+# Environment variables
 .env
 .env.*
 *.env
@@ -5,15 +6,66 @@
 # Python caches and virtual environments
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+.Python
 .venv/
 venv/
+env/
+ENV/
 
 # Jupyter artifacts
 .ipynb_checkpoints/
+*.ipynb_checkpoints
 
 # OS junk
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# log file
+# Log files
 *.log
 *.txt
+/tmp/
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Model files (large)
+*.h5
+*.hdf5
+# Keep .pt and .keras files but ignore large ones if needed
+# *.pt
+# *.keras
+
+# Data files (keep CSV but ignore large datasets if needed)
+# Uncomment if datasets are too large:
+# datasets/*.csv
+
+# Frontend build artifacts
+frontend/__pycache__/
+frontend/*.pyc
+frontend/.pytest_cache/
+frontend/dist/
+frontend/build/
+frontend/node_modules/
+
+# Flask
+instance/
+.webassets-cache
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
