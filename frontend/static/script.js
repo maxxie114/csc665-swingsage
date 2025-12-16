@@ -8,6 +8,7 @@ let currentSymbol = 'AAPL';
 let tradeSide = 'buy';
 let predictionMode = 'view';
 let portfolioChart = null;
+let latestAccountEquity = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -171,8 +172,8 @@ function setupPredictionControls() {
 
 async function refreshData() {
     showLoading();
+    await fetchAccount();
     await Promise.all([
-        fetchAccount(),
         fetchPositions(),
         fetchOrders(),
         fetchPrediction(currentSymbol, { autoTrade: false }),
@@ -239,9 +240,11 @@ async function fetchAccount() {
         document.getElementById('todayPLPercent').className = `stat-change ${changePercent >= 0 ? 'positive' : 'negative'}`;
         
         document.getElementById('buyingPower').textContent = formatCurrency(parseFloat(account.buying_power));
+        latestAccountEquity = equity;
     } catch (error) {
         console.error('Error fetching account:', error);
         showError('account', `Network error: ${error.message}`);
+        latestAccountEquity = null;
     }
 }
 
@@ -257,11 +260,11 @@ async function fetchPositions() {
     try {
         const response = await fetch(`${API_BASE}/api/positions`);
         const positions = await response.json();
-        
+
         const positionsList = document.getElementById('positionsList');
         const positionCount = document.getElementById('positionCount');
         const positionsCountBadge = document.getElementById('positionsCount');
-        
+
         if (positions.error) {
             positionsList.innerHTML = `
                 <div class="empty-state">
@@ -277,7 +280,7 @@ async function fetchPositions() {
             positionsCountBadge.textContent = '0';
             return;
         }
-        
+
         if (!Array.isArray(positions) || positions.length === 0) {
             positionsList.innerHTML = `
                 <div class="empty-state">
@@ -291,10 +294,10 @@ async function fetchPositions() {
             positionsCountBadge.textContent = '0';
             return;
         }
-        
+
         positionCount.textContent = positions.length.toString();
         positionsCountBadge.textContent = positions.length.toString();
-        
+
         positionsList.innerHTML = positions.map(pos => {
             const pl = parseFloat(pos.unrealized_pl);
             const plPercent = parseFloat(pos.unrealized_plpc) * 100;
@@ -499,6 +502,11 @@ function renderTradeResult(prediction, symbol) {
     if (tradeInfo.status === 'submitted') {
         message = `Order submitted: ${side} ${quantity} ${symbol.toUpperCase()}.`;
         styleClass = 'trade-result success';
+        fetchAccount().then(() => {
+            fetchPositions();
+            fetchOrders();
+            fetchPortfolioHistory();
+        });
     } else if (tradeInfo.status === 'failed') {
         const reason = tradeInfo.error || 'Unknown error';
         message = `Trade failed: ${reason}`;
@@ -518,7 +526,12 @@ async function fetchPortfolioHistory() {
         const response = await fetch(`${API_BASE}/api/history`);
         const history = await response.json();
 
-        const timestamps = history.timestamp || history.time || [];
+        const rawTimestamps = Array.isArray(history.timestamp)
+            ? history.timestamp
+            : Array.isArray(history.time)
+                ? history.time
+                : [];
+
         const equities = Array.isArray(history.equity) ? history.equity : [];
 
         if (!equities.length) {
@@ -530,16 +543,25 @@ async function fetchPortfolioHistory() {
 
         equities.forEach((value, index) => {
             const numeric = Number(value);
-            if (Number.isNaN(numeric)) {
+            if (!Number.isFinite(numeric)) {
                 return;
             }
 
+            const ts = rawTimestamps[index];
+            labels.push(formatHistoryTimestamp(ts));
             dataPoints.push(numeric);
-            labels.push(formatHistoryTimestamp(timestamps[index]));
         });
 
         if (!dataPoints.length) {
             return;
+        }
+
+        if (Number.isFinite(latestAccountEquity)) {
+            const lastPoint = dataPoints[dataPoints.length - 1];
+            if (Math.abs(latestAccountEquity - lastPoint) > 0.01) {
+                labels.push(formatHistoryTimestamp(Date.now()));
+                dataPoints.push(latestAccountEquity);
+            }
         }
 
         drawPortfolioChart(labels, dataPoints);

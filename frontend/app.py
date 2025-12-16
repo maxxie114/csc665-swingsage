@@ -184,9 +184,9 @@ def get_orders():
 @app.route('/api/history')
 def get_history():
     """Get portfolio history"""
-    end = datetime.now()
-    start = end - timedelta(days=30)
-    history = alpaca_request(f'/v2/account/portfolio/history?period=1M&timeframe=1D')
+    history = alpaca_request(
+        '/v2/account/portfolio/history?period=1M&timeframe=1D&extended_hours=true&include_today=true'
+    )
     return jsonify(history)
 
 

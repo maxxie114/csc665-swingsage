@@ -17,6 +17,10 @@ ENV/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
+# Vercel
+.vercel
+.env*.local
+
 # OS junk
 .DS_Store
 .DS_Store?
