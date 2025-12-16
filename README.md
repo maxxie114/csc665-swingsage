@@ -1,73 +1,159 @@
-# CSC665 SwingSage: Agentic Stock Analysis System
+# CSC665 SwingSage
 
-## Overview
-SwingSage is an advanced, agentic system designed to automate stock trading decisions. By combining deep learning (LSTM) for price trend prediction with Large Language Models (LLM) for market sentiment and indicator analysis, the system aims to make robust Buy/Sell/Hold decisions and autonomously execute trades via the Alpaca API.
+Agentic stock analysis system that fuses an LSTM price forecaster, an LLM quantitative analyst, a learnable combiner, and Alpaca-powered execution. SwingSage includes a FastAPI server, a trading dashboard frontend, and multiple research notebooks to trace every prediction.
 
-The project is currently composed of three specialized modules that will eventually merge into a single agentic operational flow.
+## Table of Contents
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Notebooks & Modules](#notebooks--modules)
+- [Getting Started](#getting-started)
+- [Configuration](#configuration)
+- [Workflows](#workflows)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [License](#license)
 
-## Modules
+## Features
+- **Unified Agent Notebook** (`auto_stock_trader_agent.ipynb`)
+    - Loads pretrained `lstm_model.keras`, `models/scaler.json`, and `models/combiner_weights_90day.pt`.
+    - Generates LSTM and LLM vectors, combines them, optionally executes trades, and can launch a FastAPI server.
+    - Built around `uv` so a single `uv sync` satisfies every dependency.
+- **LSTM Training** (`LSTM_Training_REGRESS_Import.ipynb` & `LSTM_Training_REGRESS_V2.ipynb`)
+    - Colab-friendly notebooks that train the regression model and derive buy/sell/hold signals.
+- **LLM Decisioning** (`llm_stock_analysis.ipynb`)
+    - Fetches OHLCV data via yfinance, engineers indicators, crafts prompts, and parses strict JSON responses from OpenRouter.
+- **Combiner Toolkit** (`combiner/`)
+    - PyTorch `VectorCombiner` (`combine.py`) with dataset generators for aligning LLM/LSTM predictions.
+- **Frontend Dashboard** (`frontend/`)
+    - Flask app + static dashboard to view predictions and interact with Alpaca.
+- **Datasets & Models**
+    - Curated prediction CSVs (`datasets/`) and weight files (`models/`) tracked via git.
 
-### 1. `combine.py`
-This module acts as the decision fusion engine. It provides mechanisms to combine trading signals from different sources (e.g., the LSTM model and the LLM agent).
-- **Functionality**: Implements a `VectorCombiner` using PyTorch to learn optimal weights for merging signal vectors [Buy, Sell, Hold].
-- **Key Features**: 
-    - Learnable `alpha` and `beta` parameters for weighted averaging.
-    - Support for both simple linear combination and a trainable neural network module.
+## Project Structure
+```
+csc665-swingsage/
+├── auto_stock_trader_agent.ipynb   # Unified agent (LSTM + LLM + combiner + Alpaca + FastAPI)
+├── llm_stock_analysis.ipynb        # Standalone LLM decision module
+├── LSTM_Training_REGRESS_*.ipynb   # LSTM training & inference notebooks
+├── combiner/
+│   ├── combine.py                  # PyTorch combiner model
+│   ├── generate_llm_data.py        # Build LLM prediction datasets
+│   └── generate_lstm_predictions.py# Export LSTM vectors
+├── datasets/                       # CSVs for combiner training
+├── frontend/
+│   ├── app.py                      # Flask dashboard + API bridge
+│   ├── templates/index.html        # UI layout
+│   └── static/                     # CSS/JS/assets
+├── models/
+│   ├── combiner_weights_30day.pt
+│   ├── combiner_weights_90day.pt
+│   ├── lstm_model.keras
+│   └── scaler.json
+├── PLANNER.md                      # Step-by-step execution plan
+├── README.md                       # (this file)
+├── pyproject.toml                  # uv dependency list
+└── uv.lock                         # Resolved dependency versions
+```
 
-### 2. `llm_stock_analysis.ipynb`
-This notebook houses the LLM-driven quantitative analyst.
-- **Functionality**: Fetches historical stock data and calculates a comprehensive suite of technical indicators (RSI, MACD, Bollinger Bands, etc.). It then feeds a textual snapshot of the market state to a Large Language Model (e.g., DeepSeek via OpenRouter) to generate a trading confidence vector.
-- **Key Features**:
-    - Automated extraction of technical indicators using the `ta` library.
-    - Prompt engineering for financial decision-making.
-    - structured JSON output enforcing Buy/Sell/Hold confidence scores.
+## Notebooks & Modules
+| Component | Role | How to Run |
+|-----------|------|------------|
+| `auto_stock_trader_agent.ipynb` | LSTM + LLM + combiner + Alpaca + FastAPI | `uv run jupyter lab` → open notebook, or `uv run jupyter nbconvert --execute auto_stock_trader_agent.ipynb` |
+| `llm_stock_analysis.ipynb` | LLM-only module (indicators + LangChain) | Same as above |
+| `LSTM_Training_REGRESS_Import.ipynb` | Regression LSTM training/inference | Same as above (Colab friendly) |
+| `combiner/combine.py` | Trainable fusion of vectors | `uv run python combiner/combine.py` |
+| `frontend/app.py` | Flask dashboard for Alpaca | `cd frontend && uv run python app.py` |
 
-### 3. `LSTM_Training_REGRESS_Import.ipynb`
-This notebook implements the deep learning component focused on price trend forecasting.
-- **Functionality**: Trains and runs an LSTM (Long Short-Term Memory) neural network to predict future stock prices based on historical sequences.
-- **Key Features**:
-    - Data preprocessing using `MinMaxScaler` and `yfinance`.
-    - LSTM architecture for time-series regression.
-    - Logic to convert predicted price trends into discrete Buy/Sell/Hold signals based on percentage thresholds.
+## Getting Started
+### Prerequisites
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) package manager
+- Alpaca Paper Trading API keys
+- OpenRouter API key (DeepSeek/other LLMs)
 
-## Future Roadmap: The Unified Agent
-The next phase of development involves integrating these three modules into a cohesive, single-notebook or single-script agent. This unified system will:
-1. **Perceive**: Automatically fetch live market data.
-2. **Analyze**: Run parallel analysis streams—quantitative (LSTM) and qualitative/technical (LLM).
-3. **Decide**: Fuse these signals using the logic from `combine.py` to form a final high-confidence decision.
-4. **Act**: Execute the trade orders directly using the Alpaca API (to be implemented).
-
-## Dependency Management
-This project uses **uv** for fast and reliable dependency management. All required packages are listed in `pyproject.toml`.
-
-## Deployment & Running Instructions
-
-### 1. Install Dependencies
-First, ensure you have [uv](https://github.com/astral-sh/uv) installed. Then, sync the project dependencies:
+### Install Dependencies
 ```bash
 uv sync
 ```
+This command installs every dependency defined in `pyproject.toml`, covering notebooks, FastAPI server, frontend backend, and research scripts.
 
-### 2. Running the Modules
-Each module can be run independently using `uv run`.
-
-#### Running the Combiner Script
-To run the decision fusion engine:
-```bash
-uv run combine.py
-```
-
-#### Running the Notebooks
-To interact with the analysis or training notebooks, you need to launch Jupyter.
-
-**Option A: Launch Jupyter Lab**
+### Launch Jupyter Lab
 ```bash
 uv run jupyter lab
 ```
-Then open `llm_stock_analysis.ipynb` or `LSTM_Training_REGRESS_Import.ipynb` from the interface.
+Open the notebook you wish to execute (e.g., `auto_stock_trader_agent.ipynb`).
 
-**Option B: Execute a Notebook directly (headless)**
-If you want to just execute the notebook from the command line:
+### Run Unified Agent Headlessly
 ```bash
-uv run jupyter nbconvert --to notebook --execute llm_stock_analysis.ipynb
+uv run jupyter nbconvert --to notebook --execute auto_stock_trader_agent.ipynb
 ```
+
+### Run Combiner Script
+```bash
+uv run python combiner/combine.py
+```
+
+### Run Frontend Dashboard
+```bash
+cd frontend
+uv run python app.py
+```
+Then visit `http://localhost:5000`.
+
+## Configuration
+Create `.env` in the repository root:
+```
+OPENROUTER_API_KEY=...
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=deepseek/deepseek-chat-v3.1
+ALPACA_API_KEY=...
+ALPACA_SECRET_KEY=...
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+ENABLE_SERVER=false
+DRY_RUN=true
+DEFAULT_TICKER=AAPL
+DEFAULT_PERIOD=5y
+LOOKBACK_DAYS=60
+LLM_LOG_PATH=agent_run_log.json
+USE_GPU=false
+TRADE_QUANTITY=1
+```
+Additional optional variables: `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, `ENABLE_SERVER`, `DRY_RUN` per environment, override `USE_GPU` to opt into GPU acceleration, and tweak `TRADE_QUANTITY` for consistent fills.
+
+## Workflows
+### Unified Agent Notebook
+1. **Setup Cell** – imports, env vars, logging.
+2. **Data Utils** – `fetch_stock_data`, `compute_indicators` (handles yfinance MultiIndex columns).
+3. **LSTM Section** – loads `lstm_model.keras` + scaler, predicts next close, generates soft vector.
+4. **LLM Section** – indicator snapshot, prompt, LangChain call, strict JSON parser.
+5. **Combiner Section** – loads `models/combiner_weights_90day.pt`, merges vectors.
+6. **Trading Section** – Alpaca order helper with `DRY_RUN` guard.
+7. **Orchestration** – `run_agent()` prints JSON summary and optionally executes trade.
+8. **FastAPI Section** – `ENABLE_SERVER=true` spawns `/health`, `/decision`, `/trade` endpoints.
+9. **Tests Section** – smoke tests for parser + combiner plus handy `uv` commands.
+
+### Frontend Dashboard
+- Python/Flask backend with endpoints under `/api/*`.
+- Uses Alpaca for account, positions, orders, history, quotes, trades.
+- Integrates OpenRouter (Kimi K2) for conversational assistance.
+- Static assets stored in `frontend/static/` with AMOLED-themed UI.
+
+### Combiner Training
+- `datasets/combined_llm_lstm_aapl_*.csv` provide aligned target data.
+- `combiner/generate_*` scripts regenerate datasets when needed.
+- `combine.py` trains weights, prints accuracy comparisons, and saves PT files.
+
+## Testing
+- Notebook smoke tests (`run_smoke_tests()` in `auto_stock_trader_agent.ipynb`).
+- Combiner training script reports loss/accuracy each 100 epochs.
+- Frontend has `/api/test` to verify Alpaca connectivity.
+- Manual tests: run `uv run python combiner/combine.py` and ensure weights save; in dashboard, hit `/api/account`/`/api/orders` endpoints.
+
+## Roadmap
+- [ ] Expand FastAPI endpoints to stream LLM/LSTM vectors to frontend.
+- [ ] Build CI workflow for linting and notebook execution.
+- [ ] Integrate real-time WebSocket updates in dashboard.
+- [ ] Package agent as a deployable service with Docker.
+
+## License
+Apache 2.0 (placeholder—update as needed).
