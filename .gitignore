@@ -32,7 +32,6 @@ Thumbs.db
 
 # Log files
 *.log
-*.txt
 /tmp/
 *.tmp
 
