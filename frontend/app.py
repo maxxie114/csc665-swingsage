@@ -32,10 +32,13 @@ ALPACA_API_KEY = os.getenv('ALPACA_API_KEY', '')
 ALPACA_SECRET_KEY = os.getenv('ALPACA_SECRET_KEY', '')
 ALPACA_BASE_URL = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
 
-# OpenRouter API Configuration for Kimi K2 Chat
+# OpenRouter / LLM Configuration (match FastAPI server defaults)
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
 OPENROUTER_BASE_URL = os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
-KIMI_MODEL = "moonshotai/kimi-k2-0905"  # Kimi K2 model on OpenRouter
+OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-chat-v3.1')
+
+# FastAPI agent configuration
+FASTAPI_SERVER_URL = os.getenv('FASTAPI_SERVER_URL', 'http://localhost:8000')
 
 # Debug: Print if keys are loaded (without showing full key)
 if ALPACA_API_KEY:
@@ -97,6 +100,24 @@ def alpaca_request(endpoint, method='GET', data=None):
         return {'error': 'Connection error - Cannot reach Alpaca API'}
     except Exception as e:
         return {'error': f'API Error: {str(e)}'}
+
+
+def fastapi_request(path: str, method: str = 'GET', params=None, payload=None):
+    """Call the notebook-hosted FastAPI agent if configured."""
+    base = (FASTAPI_SERVER_URL or '').strip()
+    if not base:
+        return {'error': 'FASTAPI_SERVER_URL not configured'}
+    url = f"{base.rstrip('/')}/{path.lstrip('/')}"
+    try:
+        if method.upper() == 'POST':
+            resp = requests.post(url, params=params, json=payload, timeout=30)
+        else:
+            resp = requests.get(url, params=params, timeout=30)
+        if resp.status_code == 200:
+            return resp.json()
+        return {'error': resp.text, 'status': resp.status_code}
+    except Exception as exc:
+        return {'error': str(exc)}
 
 
 @app.route('/')
@@ -646,32 +667,63 @@ def confirm_trade():
 
 def get_prediction_data(symbol):
     """Get model prediction data (helper function)"""
-    import random
-    
-    # Simulated prediction based on our combiner model
-    predictions = {
-        'AAPL': {
-            'llm': {'buy': 0.45, 'sell': 0.25, 'hold': 0.30, 'signal': 'BUY'},
-            'lstm': {'buy': 0.20, 'sell': 0.60, 'hold': 0.20, 'signal': 'SELL'},
-            'combined': {'buy': 0.28, 'sell': 0.50, 'hold': 0.22, 'signal': 'SELL'},
-            'confidence': 0.50,
-            'model_weights': {'llm': 0.14, 'lstm': 0.86}
-        }
+
+    symbol = symbol.upper()
+    agent_response = fastapi_request('/decision', params={'ticker': symbol})
+
+    if agent_response and 'error' not in agent_response:
+        try:
+            llm_vec = agent_response.get('llm', {}).get('vector', [0, 0, 0])
+            lstm_vec = agent_response.get('lstm', {}).get('vector', [0, 0, 0])
+            comb_vec = agent_response.get('combiner', {}).get('vector', [0, 0, 0])
+
+            llm_section = {
+                'buy': float(llm_vec[0]) if len(llm_vec) > 0 else 0,
+                'sell': float(llm_vec[1]) if len(llm_vec) > 1 else 0,
+                'hold': float(llm_vec[2]) if len(llm_vec) > 2 else 0,
+                'signal': agent_response.get('llm', {}).get('view', 'HOLD'),
+                'explanation': agent_response.get('llm', {}).get('explanation', '')
+            }
+            lstm_section = {
+                'buy': float(lstm_vec[0]) if len(lstm_vec) > 0 else 0,
+                'sell': float(lstm_vec[1]) if len(lstm_vec) > 1 else 0,
+                'hold': float(lstm_vec[2]) if len(lstm_vec) > 2 else 0,
+                'signal': agent_response.get('lstm', {}).get('label', 'HOLD')
+            }
+            combined_section = {
+                'buy': float(comb_vec[0]) if len(comb_vec) > 0 else 0,
+                'sell': float(comb_vec[1]) if len(comb_vec) > 1 else 0,
+                'hold': float(comb_vec[2]) if len(comb_vec) > 2 else 0,
+                'signal': agent_response.get('combiner', {}).get('label', 'HOLD')
+            }
+
+            confidence = max(combined_section['buy'], combined_section['sell'], combined_section['hold'])
+
+            return {
+                'symbol': symbol,
+                'llm': llm_section,
+                'lstm': lstm_section,
+                'combined': combined_section,
+                'confidence': confidence,
+                'model_weights': {
+                    'alpha': agent_response.get('combiner', {}).get('alpha'),
+                    'beta': agent_response.get('combiner', {}).get('beta')
+                },
+                'raw': agent_response
+            }
+        except Exception as exc:
+            print(f"Error parsing FastAPI decision: {exc}")
+
+    # Fallback: deterministic neutral output if FastAPI is unavailable
+    return {
+        'symbol': symbol,
+        'llm': {'buy': 0.33, 'sell': 0.33, 'hold': 0.34, 'signal': 'HOLD'},
+        'lstm': {'buy': 0.33, 'sell': 0.33, 'hold': 0.34, 'signal': 'HOLD'},
+        'combined': {'buy': 0.33, 'sell': 0.33, 'hold': 0.34, 'signal': 'HOLD'},
+        'confidence': 0.34,
+        'model_weights': {'alpha': 0.5, 'beta': 0.5},
+        'warning': 'FastAPI decision server unavailable; using neutral placeholder.'
     }
-    
-    if symbol.upper() in predictions:
-        return predictions[symbol.upper()]
-    else:
-        # Generate random prediction for other symbols
-        signals = ['BUY', 'SELL', 'HOLD']
-        signal = random.choice(signals)
-        return {
-            'llm': {'buy': 0.33, 'sell': 0.33, 'hold': 0.34, 'signal': signal},
-            'lstm': {'buy': 0.33, 'sell': 0.33, 'hold': 0.34, 'signal': signal},
-            'combined': {'buy': 0.33, 'sell': 0.33, 'hold': 0.34, 'signal': signal},
-            'confidence': 0.33,
-            'model_weights': {'llm': 0.14, 'lstm': 0.86}
-        }
 
 
 def get_quote_data(symbol):
@@ -957,7 +1009,7 @@ def call_openrouter_api(messages, tools=None):
     }
     
     payload = {
-        "model": KIMI_MODEL,
+        "model": OPENROUTER_MODEL,
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 1000
@@ -1009,7 +1061,7 @@ def get_kimi_client(with_tools=True):
         llm = ChatOpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
-            model=KIMI_MODEL,
+            model=OPENROUTER_MODEL,
             temperature=0.7,
             max_tokens=1000,
             default_headers={
@@ -1105,11 +1157,64 @@ def get_stock_info(symbol):
 
 @app.route('/api/prediction/<symbol>')
 def get_prediction(symbol):
-    """Get model prediction for a symbol"""
+    """Get model prediction for a symbol and optionally execute an automated trade"""
+    auto_trade = request.args.get('auto_trade', 'false').lower() == 'true'
+    quantity = request.args.get('quantity', default=1, type=int)
+    quantity = quantity if quantity and quantity > 0 else 1
+
     prediction = get_prediction_data(symbol)
+
+    if auto_trade:
+        trade_payload = {'status': 'skipped', 'reason': 'Signal unavailable'}
+        combined_signal = (prediction.get('combined', {}).get('signal') or '').upper()
+
+        if combined_signal in {'BUY', 'SELL'}:
+            config_error = validate_alpaca_config()
+            if config_error:
+                trade_payload = {
+                    'status': 'failed',
+                    'error': config_error['error']
+                }
+            else:
+                order = {
+                    'symbol': symbol.upper(),
+                    'qty': quantity,
+                    'side': combined_signal.lower(),
+                    'type': 'market',
+                    'time_in_force': 'day'
+                }
+                trade_response = alpaca_request('/v2/orders', method='POST', data=order)
+
+                if isinstance(trade_response, dict) and trade_response.get('error'):
+                    trade_payload = {
+                        'status': 'failed',
+                        'error': trade_response.get('error'),
+                        'details': trade_response
+                    }
+                else:
+                    trade_payload = {
+                        'status': 'submitted',
+                        'order': trade_response,
+                        'quantity': quantity,
+                        'side': combined_signal.lower()
+                    }
+        else:
+            trade_payload = {
+                'status': 'skipped',
+                'reason': 'Signal HOLD - no trade executed'
+            }
+
+        prediction['auto_trade'] = True
+        prediction['trade'] = trade_payload
+        prediction['trade_quantity'] = quantity
+    else:
+        prediction['auto_trade'] = False
+        prediction['trade'] = None
+        prediction['trade_quantity'] = None
+
     return jsonify(prediction)
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001, host='127.0.0.1')
+    app.run(debug=False, port=5000, host='127.0.0.1')
 

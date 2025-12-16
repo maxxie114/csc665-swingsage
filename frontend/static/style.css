@@ -333,6 +333,20 @@ body {
     gap: 12px;
 }
 
+.chart-card {
+    margin-top: 16px;
+}
+
+.chart-body {
+    padding: 16px;
+    height: 260px;
+}
+
+#equityChart {
+    width: 100%;
+    height: 100%;
+}
+
 /* Predictions View - Full Width */
 #predictionsView .prediction-card {
     max-width: 100%;
@@ -368,6 +382,98 @@ body {
 
 .prediction-content {
     padding: 16px;
+}
+
+.prediction-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.mode-toggle {
+    display: flex;
+    gap: 8px;
+}
+
+.mode-btn {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mode-btn:hover,
+.mode-btn:focus {
+    border-color: var(--blue-primary);
+    color: var(--blue-primary);
+    outline: none;
+}
+
+.mode-btn.active {
+    background: var(--blue-primary);
+    border-color: var(--blue-primary);
+    color: #fff;
+}
+
+.mode-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auto-trade-quantity {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.auto-trade-quantity input {
+    width: 90px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.auto-trade-quantity input:focus {
+    border-color: var(--blue-primary);
+    outline: none;
+}
+
+.trade-result {
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    display: none;
+}
+
+.trade-result.success {
+    background: rgba(27, 133, 64, 0.18);
+    color: #4ADF7C;
+}
+
+.trade-result.warning {
+    background: rgba(245, 165, 36, 0.18);
+    color: #F5A524;
+}
+
+.trade-result.error {
+    background: rgba(255, 80, 0, 0.16);
+    color: #FF8360;
 }
 
 .signal-display {
@@ -559,6 +665,22 @@ body {
     flex-direction: column;
     gap: 8px;
 }
+    .llm-explanation {
+        padding: 16px;
+        border-radius: 12px;
+        background: rgba(80, 112, 255, 0.1);
+        border: 1px solid rgba(80, 112, 255, 0.2);
+    }
+    .llm-explanation h3 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        color: var(--text-primary);
+    }
+    .llm-explanation p {
+        margin: 0;
+        color: var(--text-secondary);
+        line-height: 1.5;
+    }
 
 .prob-item {
     display: flex;

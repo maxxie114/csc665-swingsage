@@ -68,3 +68,5 @@ instance/
 htmlcov/
 *.cover
 .hypothesis/
+.vercel
+.env*.local

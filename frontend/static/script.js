@@ -6,6 +6,8 @@ const API_BASE = '';
 // State
 let currentSymbol = 'AAPL';
 let tradeSide = 'buy';
+let predictionMode = 'view';
+let portfolioChart = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initializeApp() {
     setupEventListeners();
+    setupPredictionControls();
     setupChatListeners();
     await testAlpacaConnection();
     await refreshData();
@@ -137,14 +140,44 @@ function setupEventListeners() {
     document.getElementById('tradeQty').addEventListener('input', updateEstimatedCost);
 }
 
+function setupPredictionControls() {
+    const modeButtons = document.querySelectorAll('[data-prediction-mode]');
+    const quantityGroup = document.getElementById('autoTradeQuantityGroup');
+    const runButton = document.getElementById('runPredictionBtn');
+
+    modeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            predictionMode = button.dataset.predictionMode;
+            modeButtons.forEach(btn => btn.classList.toggle('active', btn === button));
+
+            if (quantityGroup) {
+                quantityGroup.style.display = predictionMode === 'trade' ? 'flex' : 'none';
+            }
+        });
+    });
+
+    if (runButton) {
+        runButton.addEventListener('click', async () => {
+            const qtyInput = document.getElementById('autoTradeQty');
+            const quantity = qtyInput ? Math.max(parseInt(qtyInput.value, 10) || 1, 1) : 1;
+
+            await fetchPrediction(currentSymbol, {
+                autoTrade: predictionMode === 'trade',
+                quantity
+            });
+        });
+    }
+}
+
 async function refreshData() {
     showLoading();
     await Promise.all([
         fetchAccount(),
         fetchPositions(),
         fetchOrders(),
-        fetchPrediction(currentSymbol),
-        fetchQuote(currentSymbol)
+        fetchPrediction(currentSymbol, { autoTrade: false }),
+        fetchQuote(currentSymbol),
+        fetchPortfolioHistory()
     ]);
     hideLoading();
 }
@@ -342,55 +375,276 @@ async function fetchOrders() {
     }
 }
 
-async function fetchPrediction(symbol) {
+async function fetchPrediction(symbol, options = {}) {
+    const { autoTrade = false, quantity = 1 } = options;
+
     try {
-        const response = await fetch(`${API_BASE}/api/prediction/${symbol}`);
+        let url = `${API_BASE}/api/prediction/${symbol}`;
+        const params = new URLSearchParams();
+
+        if (autoTrade) {
+            params.append('auto_trade', 'true');
+            params.append('quantity', Math.max(quantity, 1).toString());
+        }
+
+        if (params.toString()) {
+            url = `${url}?${params.toString()}`;
+        }
+
+        const response = await fetch(url);
         const prediction = await response.json();
-        
+
         document.getElementById('predictionSymbol').textContent = symbol;
-        
-        // Update signal display
+
+        const signal = (prediction?.combined?.signal || 'HOLD').toUpperCase();
         const signalDisplay = document.getElementById('signalDisplay');
-        const signal = prediction.combined.signal;
-        
         signalDisplay.className = `signal-display ${signal.toLowerCase()}`;
         signalDisplay.querySelector('.signal-text').textContent = signal;
-        
-        // Update confidence
-        const confidence = prediction.confidence * 100;
-        document.getElementById('confidenceValue').textContent = `${confidence.toFixed(0)}%`;
-        document.getElementById('confidenceFill').style.width = `${confidence}%`;
-        
-        // Update model weights
-        document.getElementById('llmWeight').textContent = `${(prediction.model_weights.llm * 100).toFixed(0)}%`;
-        document.getElementById('lstmWeight').textContent = `${(prediction.model_weights.lstm * 100).toFixed(0)}%`;
-        
-        // Update model signals
+
+        const confidence = Math.max(0, Math.min(1, prediction.confidence || 0));
+        document.getElementById('confidenceValue').textContent = `${(confidence * 100).toFixed(0)}%`;
+        document.getElementById('confidenceFill').style.width = `${confidence * 100}%`;
+
+        const weights = prediction.model_weights || {};
+        const llmWeightValue = weights.alpha ?? weights.llm;
+        const lstmWeightValue = weights.beta ?? weights.lstm;
+        document.getElementById('llmWeight').textContent = weightDisplay(llmWeightValue);
+        document.getElementById('lstmWeight').textContent = weightDisplay(lstmWeightValue);
+
         const llmSignal = document.getElementById('llmSignal');
         const lstmSignal = document.getElementById('lstmSignal');
-        
-        llmSignal.textContent = prediction.llm.signal;
-        llmSignal.style.color = getSignalColor(prediction.llm.signal);
-        llmSignal.style.background = getSignalBg(prediction.llm.signal);
-        
-        lstmSignal.textContent = prediction.lstm.signal;
-        lstmSignal.style.color = getSignalColor(prediction.lstm.signal);
-        lstmSignal.style.background = getSignalBg(prediction.lstm.signal);
-        
-        // Update probability bars
-        const combined = prediction.combined;
-        document.getElementById('buyProb').style.width = `${combined.buy * 100}%`;
-        document.getElementById('buyProbValue').textContent = `${(combined.buy * 100).toFixed(0)}%`;
-        
-        document.getElementById('sellProb').style.width = `${combined.sell * 100}%`;
-        document.getElementById('sellProbValue').textContent = `${(combined.sell * 100).toFixed(0)}%`;
-        
-        document.getElementById('holdProb').style.width = `${combined.hold * 100}%`;
-        document.getElementById('holdProbValue').textContent = `${(combined.hold * 100).toFixed(0)}%`;
-        
+
+        const llmData = prediction.llm || {};
+        const lstmData = prediction.lstm || {};
+
+        llmSignal.textContent = (llmData.signal || 'HOLD').toUpperCase();
+        llmSignal.style.color = getSignalColor(llmSignal.textContent);
+        llmSignal.style.background = getSignalBg(llmSignal.textContent);
+
+        lstmSignal.textContent = (lstmData.signal || 'HOLD').toUpperCase();
+        lstmSignal.style.color = getSignalColor(lstmSignal.textContent);
+        lstmSignal.style.background = getSignalBg(lstmSignal.textContent);
+
+        const combined = prediction.combined || { buy: 0.33, sell: 0.33, hold: 0.34 };
+        updateProbabilityBar('buy', combined.buy || 0);
+        updateProbabilityBar('sell', combined.sell || 0);
+        updateProbabilityBar('hold', combined.hold || 0);
+
+        updateLlmExplanation(llmData.explanation);
+        renderTradeResult(prediction, symbol);
+
     } catch (error) {
         console.error('Error fetching prediction:', error);
     }
+}
+
+function weightDisplay(value) {
+    if (value === undefined || value === null || Number.isNaN(value)) {
+        return '—';
+    }
+    return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(0)}%`;
+}
+
+function updateProbabilityBar(kind, value) {
+    const clamped = Math.max(0, Math.min(1, value || 0));
+    const bar = document.getElementById(`${kind}Prob`);
+    const label = document.getElementById(`${kind}ProbValue`);
+
+    if (bar) {
+        bar.style.width = `${clamped * 100}%`;
+    }
+
+    if (label) {
+        label.textContent = `${(clamped * 100).toFixed(0)}%`;
+    }
+}
+
+function updateLlmExplanation(explanation) {
+    const container = document.getElementById('llmExplanationContainer');
+    const textEl = document.getElementById('llmExplanation');
+
+    if (!container || !textEl) {
+        return;
+    }
+
+    if (explanation && explanation.trim().length > 0) {
+        textEl.textContent = explanation.trim();
+        container.style.display = 'block';
+    } else {
+        textEl.textContent = '';
+        container.style.display = 'none';
+    }
+}
+
+function renderTradeResult(prediction, symbol) {
+    const tradeEl = document.getElementById('tradeResult');
+    if (!tradeEl) {
+        return;
+    }
+
+    if (!prediction.auto_trade) {
+        tradeEl.style.display = 'none';
+        tradeEl.className = 'trade-result';
+        tradeEl.textContent = '';
+        return;
+    }
+
+    const tradeInfo = prediction.trade || {};
+    const quantity = tradeInfo.quantity || prediction.trade_quantity || 1;
+    const side = (tradeInfo.side || (prediction.combined?.signal ?? 'hold')).toString().toUpperCase();
+
+    let message = 'Automated trade executed.';
+    let styleClass = 'trade-result warning';
+
+    if (tradeInfo.status === 'submitted') {
+        message = `Order submitted: ${side} ${quantity} ${symbol.toUpperCase()}.`;
+        styleClass = 'trade-result success';
+    } else if (tradeInfo.status === 'failed') {
+        const reason = tradeInfo.error || 'Unknown error';
+        message = `Trade failed: ${reason}`;
+        styleClass = 'trade-result error';
+    } else if (tradeInfo.status === 'skipped') {
+        message = tradeInfo.reason || 'Automated trade skipped.';
+        styleClass = 'trade-result warning';
+    }
+
+    tradeEl.style.display = 'block';
+    tradeEl.className = styleClass;
+    tradeEl.textContent = message;
+}
+
+async function fetchPortfolioHistory() {
+    try {
+        const response = await fetch(`${API_BASE}/api/history`);
+        const history = await response.json();
+
+        const timestamps = history.timestamp || history.time || [];
+        const equities = Array.isArray(history.equity) ? history.equity : [];
+
+        if (!equities.length) {
+            return;
+        }
+
+        const labels = [];
+        const dataPoints = [];
+
+        equities.forEach((value, index) => {
+            const numeric = Number(value);
+            if (Number.isNaN(numeric)) {
+                return;
+            }
+
+            dataPoints.push(numeric);
+            labels.push(formatHistoryTimestamp(timestamps[index]));
+        });
+
+        if (!dataPoints.length) {
+            return;
+        }
+
+        drawPortfolioChart(labels, dataPoints);
+    } catch (error) {
+        console.error('Error fetching portfolio history:', error);
+    }
+}
+
+function formatHistoryTimestamp(value) {
+    if (value === undefined || value === null) {
+        return '';
+    }
+
+    let date;
+
+    if (typeof value === 'number') {
+        date = new Date(value.toString().length === 10 ? value * 1000 : value);
+    } else {
+        const numeric = Number(value);
+        if (!Number.isNaN(numeric) && value.toString().trim() !== '') {
+            date = new Date(value.length === 10 ? numeric * 1000 : numeric);
+        } else {
+            date = new Date(value);
+        }
+    }
+
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function drawPortfolioChart(labels, dataPoints) {
+    const canvas = document.getElementById('equityChart');
+    if (!canvas || typeof Chart === 'undefined' || !dataPoints.length) {
+        return;
+    }
+
+    const context = canvas.getContext('2d');
+
+    if (portfolioChart) {
+        portfolioChart.data.labels = labels;
+        portfolioChart.data.datasets[0].data = dataPoints;
+        portfolioChart.update();
+        return;
+    }
+
+    const gradient = context.createLinearGradient(0, 0, 0, 240);
+    gradient.addColorStop(0, 'rgba(80, 112, 255, 0.35)');
+    gradient.addColorStop(1, 'rgba(80, 112, 255, 0)');
+
+    portfolioChart = new Chart(context, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Equity',
+                    data: dataPoints,
+                    borderColor: '#5070FF',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: (ctx) => `Equity: ${formatCurrency(ctx.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: 'var(--text-secondary)',
+                        maxRotation: 0,
+                        autoSkip: true
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: 'var(--text-secondary)',
+                        callback: (value) => formatShortCurrency(value)
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                }
+            }
+        }
+    });
 }
 
 async function executeTrade() {
@@ -469,6 +723,24 @@ function formatCurrency(value) {
 function formatPercent(value) {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatShortCurrency(value) {
+    const absValue = Math.abs(value);
+
+    if (absValue >= 1_000_000_000) {
+        return `$${(value / 1_000_000_000).toFixed(1)}B`;
+    }
+
+    if (absValue >= 1_000_000) {
+        return `$${(value / 1_000_000).toFixed(1)}M`;
+    }
+
+    if (absValue >= 1_000) {
+        return `$${(value / 1_000).toFixed(1)}K`;
+    }
+
+    return formatCurrency(value);
 }
 
 function getSignalColor(signal) {
