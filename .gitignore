@@ -73,3 +73,4 @@ htmlcov/
 .hypothesis/
 .vercel
 .env*.local
+cloudflared
