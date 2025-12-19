@@ -244,7 +244,7 @@ TRADE_QUANTITY=1         # Default number of shares per trade when orders are pl
 ## Contribution & Licensing
 - **How to contribute:** Fork the repository, create a feature branch off `main`, run notebook smoke tests (`run_smoke_tests()` in [auto_stock_trader_agent.ipynb](auto_stock_trader_agent.ipynb)), ensure `uv sync` succeeds without lockfile changes unless dependencies are updated, and open a pull request describing testing evidence.
 - **Code of conduct:** Follow respectful collaboration norms; seek review before merging, and avoid committing secrets (use [.env.example](.env.example) patterns).
-- **License:** Apache License 2.0 — contributions are accepted under the same terms.
+- **License:** MIT License — see [LICENSE](LICENSE) for terms.
 
 ## Roadmap
 - Expand FastAPI endpoints to stream intermediate vectors to the dashboard.
