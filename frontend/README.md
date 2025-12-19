@@ -89,3 +89,44 @@ frontend/
 - `403` with “Guardrail service unavailable”: verify `OPENROUTER_API_KEY`, guard model access, and network connectivity.
 - “AI assistant is not available”: ensure the FastAPI agent is running and `FASTAPI_SERVER_URL` points to it.
 
+## Deploying to Vercel
+1. **Prepare the project**
+    - Ensure `frontend/requirements.txt` lists all runtime dependencies.
+    - Confirm `app.py` reads configuration exclusively from environment variables (no local `.env` assumed during deployment).
+
+2. **Vercel project setup**
+    - Create a new Vercel project and select “Import Git Repository,” pointing to this repository (branch `main` by default).
+    - Set the project root to `frontend/` so build commands run inside the Flask app directory.
+
+3. **Environment variables**
+    Populate the following in Vercel → Settings → Environment Variables (use Production & Preview scopes):
+    | Key | Suggested Value |
+    | --- | --- |
+    | `OPENROUTER_API_KEY` | OpenRouter token |
+    | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` |
+    | `OPENROUTER_MODEL` | `deepseek/deepseek-chat-v3.1` |
+    | `OPENROUTER_GUARD_MODEL` | `meta-llama/llama-guard-4-12b` |
+    | `ENABLE_CHAT_GUARD` | `true` |
+    | `ALPACA_API_KEY` | Alpaca paper key |
+    | `ALPACA_SECRET_KEY` | Alpaca paper secret |
+    | `ALPACA_BASE_URL` | `https://paper-api.alpaca.markets` |
+    | `FASTAPI_SERVER_URL` | Public URL of your notebook/agent (e.g., Cloudflare tunnel) |
+
+4. **Build & run commands**
+    Configure the project to use:
+    - **Build Command:** `uv pip install -r requirements.txt`
+    - **Output Directory:** (leave blank; Flask served via serverless)
+    - **Install Command:** leave empty so Vercel uses the Build Command.
+    - **Root Directory:** `frontend`
+
+5. **Serverless entrypoint**
+    Vercel detects Flask via `app.py`. If deploying with the Vercel Python runtime, ensure `app` is defined at module scope (already true). Vercel will run the app under its serverless environment.
+
+6. **Post-deploy checks**
+    - Visit the deployment URL to verify static assets load and the chat guardrails respond correctly.
+    - Confirm `/api/test` succeeds (Alpaca credentials) and `/api/chat` can reach your FastAPI agent.
+
+7. **Custom domains / environment promotion**
+    - Promote a Preview deployment to Production once validated.
+    - Attach a custom domain via Vercel if desired; ensure your FastAPI backend remains reachable from that domain.
+
