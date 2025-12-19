@@ -1066,6 +1066,12 @@ function addChatMessage(content, isUser = false, type = 'text', data = null) {
                 <span>${content}</span>
             </div>
         `;
+    } else if (type === 'guard') {
+        const formattedContent = formatMarkdown(content);
+        messageHTML = `
+            <div class="message-content guard-message">${formattedContent}</div>
+            <div class="message-time">${time}</div>
+        `;
     }
     
     messageDiv.innerHTML = messageHTML;
@@ -1098,12 +1104,30 @@ async function sendChatMessage(message) {
             },
             body: JSON.stringify({ message: message })
         });
-        
-        const data = await response.json();
+
+        let data;
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            data = { type: 'error', message: text || 'Unexpected response from server.' };
+        }
         
         // Remove loading
         removeLoadingMessage();
         
+        if (!response.ok) {
+            if (response.status === 403 && (data.guard_blocked || data.type === 'guard_blocked')) {
+                const reason = data.reason || data.message || 'Request blocked by safety policy.';
+                addChatMessage(`Request denied: ${reason}`, false, 'guard');
+                return;
+            }
+            const messageText = data.message || 'Request failed.';
+            addChatMessage(`Error: ${messageText}`, false);
+            return;
+        }
+
         // Handle response based on type
         if (data.type === 'text') {
             addChatMessage(data.message, false);

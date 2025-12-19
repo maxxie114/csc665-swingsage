@@ -1199,6 +1199,12 @@ body {
     border-bottom-left-radius: 4px;
 }
 
+.chat-message.ai .guard-message {
+    background: rgba(255, 80, 0, 0.12);
+    border: 1px solid var(--red-primary);
+    color: var(--red-primary);
+}
+
 .message-time {
     font-size: 11px;
     color: var(--text-tertiary);

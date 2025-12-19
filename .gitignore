@@ -34,6 +34,9 @@ Thumbs.db
 *.log
 /tmp/
 *.tmp
+agent_run_log.txt
+llm_decision_log.txt
+tunnel.log
 
 # IDE
 .vscode/
